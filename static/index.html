@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#d4001a">
+<title>Video İndir</title>
+<style>
+  :root{
+    --red:#d4001a; --red-dark:#a80014; --ink:#16181c; --muted:#6a707a;
+    --bg:#f6f6f4; --card:#fff; --line:#e2e3e0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#f2f2f0; --muted:#9aa0a8; --bg:#121315; --card:#1c1e21; --line:#2c2f33; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--ink);
+    padding:max(20px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));
+    max-width:520px; margin:0 auto; min-height:100dvh;
+  }
+  h1{font-size:2rem; line-height:1.05; font-weight:800; letter-spacing:-.02em; margin:14px 0 6px}
+  .sub{color:var(--muted); margin:0 0 22px; font-size:.98rem}
+  label{display:block; font-weight:600; font-size:.9rem; margin-bottom:6px}
+  input[type=text],input[type=password]{
+    width:100%; font:inherit; font-size:1rem; padding:14px; border-radius:10px;
+    border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+  }
+  input:focus-visible,button:focus-visible{outline:3px solid var(--red); outline-offset:2px}
+  .row{display:flex; gap:10px; margin-top:10px}
+  .btn{
+    flex:1; font:inherit; font-weight:700; font-size:1rem; padding:15px; border-radius:10px;
+    border:0; background:var(--red); color:#fff; cursor:pointer;
+  }
+  .btn:active{background:var(--red-dark)}
+  .btn.ghost{background:transparent; color:var(--ink); border:1.5px solid var(--line); flex:0 0 auto; padding:15px 18px}
+  .btn[disabled]{opacity:.6}
+  .check{display:flex; gap:10px; align-items:flex-start; margin:14px 0 18px; font-size:.95rem}
+  .check input{width:22px; height:22px; margin:1px 0 0; accent-color:var(--red); flex:none}
+  .check small{display:block; color:var(--muted)}
+  #msg{margin-top:14px; font-size:.95rem; min-height:1.3em}
+  #msg.err{color:var(--red); font-weight:600}
+  #result{display:none; margin-top:18px}
+  video{width:100%; max-height:60dvh; border-radius:12px; background:#000}
+  #gate{display:none; margin-bottom:18px}
+</style>
+</head>
+<body>
+  <h1>Instagram video indir</h1>
+  <p class="sub">Linki yapıştır, videoyu telefonuna kaydet.</p>
+
+  <div id="gate">
+    <label for="key">Şifre</label>
+    <input id="key" type="password" autocomplete="current-password">
+  </div>
+
+  <label for="url">Video linki</label>
+  <input id="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off"
+         placeholder="https://www.instagram.com/reel/...">
+
+  <label class="check">
+    <input id="story" type="checkbox" checked>
+    <span>Hikaye için uyarla<small>1080×1920, 9:16 — paylaştığında kalite düşmez</small></span>
+  </label>
+
+  <div class="row">
+    <button class="btn ghost" id="paste" type="button">Yapıştır</button>
+    <button class="btn" id="go" type="button">Videoyu hazırla</button>
+  </div>
+  <div id="msg" role="status" aria-live="polite"></div>
+
+  <div id="result">
+    <video id="player" controls playsinline></video>
+    <div class="row">
+      <button class="btn" id="save" type="button">Telefona kaydet</button>
+    </div>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = { get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}},
+                set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}} };
+let fileId = null;
+
+function say(t, err){ $("msg").textContent = t; $("msg").className = err ? "err" : ""; }
+function key(){ return $("key").value || store.get("k"); }
+
+$("key").value = store.get("k");
+
+$("paste").onclick = async () => {
+  try { $("url").value = (await navigator.clipboard.readText()).trim(); }
+  catch(e){ say("Yapıştırma izni verilmedi. Kutuya uzun basıp yapıştır.", true); }
+};
+
+$("go").onclick = async () => {
+  const url = $("url").value.trim();
+  if(!url){ say("Önce bir link yapıştır.", true); return; }
+  $("go").disabled = true; $("result").style.display = "none";
+  say("Video indiriliyor, bu birkaç saniye sürebilir…");
+  try{
+    const r = await fetch("/api/download", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "X-Key": key() },
+      body: JSON.stringify({ url, story: $("story").checked })
+    });
+    const d = await r.json();
+    if(r.status === 401){ $("gate").style.display = "block"; say(d.error || "Şifre gerekli.", true); return; }
+    if(!r.ok){ say(d.error || "Bir hata oldu.", true); return; }
+    store.set("k", $("key").value || store.get("k"));
+    fileId = d.id;
+    $("player").src = `/file/${d.id}?k=${encodeURIComponent(key())}`;
+    $("result").style.display = "block";
+    say(`Hazır (${(d.size/1048576).toFixed(1)} MB).`);
+  }catch(e){
+    say("Sunucuya ulaşılamadı.", true);
+  }finally{
+    $("go").disabled = false;
+  }
+};
+
+$("save").onclick = async () => {
+  const src = `/file/${fileId}?k=${encodeURIComponent(key())}`;
+  try{
+    const blob = await (await fetch(src)).blob();
+    const file = new File([blob], "autoglym-video.mp4", { type:"video/mp4" });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file] });   // iPhone: "Videoyu Kaydet"
+      return;
+    }
+  }catch(e){ if(e.name === "AbortError") return; }
+  location.href = src + "&dl=1";                  // yedek: normal indirme
+};
+</script>
+</body>
+</html>
