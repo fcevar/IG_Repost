@@ -71,7 +71,10 @@ def download():
         "no_warnings": True,
     }
     if COOKIES and Path(COOKIES).exists():
-        opts["cookiefile"] = COOKIES
+        # Secret File salt okunur; yt-dlp cookies'i geri yazmak ister, o yüzden kopyalıyoruz
+        tmp_cookies = DOWNLOAD_DIR / f"cookies_{vid}.txt"
+        shutil.copyfile(COOKIES, tmp_cookies)
+        opts["cookiefile"] = str(tmp_cookies)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -84,6 +87,9 @@ def download():
     except Exception as e:
         ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI YOK"
         return jsonify(error=f"[{ck}] {type(e).__name__}: {str(e)[-300:]}"), 500
+
+    finally:
+        (DOWNLOAD_DIR / f"cookies_{vid}.txt").unlink(missing_ok=True)
 
     if not path.exists():
         return jsonify(error="Dosya bulunamadı."), 500
