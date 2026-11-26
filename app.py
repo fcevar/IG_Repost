@@ -78,10 +78,9 @@ def download():
             info = ydl.extract_info(url, download=True)
             path = Path(ydl.prepare_filename(info))
     except yt_dlp.utils.DownloadError as e:
-        msg = str(e).lower()
-        if "login" in msg or "cookies" in msg or "rate-limit" in msg:
-            return jsonify(error="Instagram giriş istiyor. Sunucuya cookies.txt ekle (README'ye bak)."), 502
-        return jsonify(error="Video indirilemedi. Hesap herkese açık mı, link doğru mu?"), 502
+        raw = str(e).replace("\n", " ")[-300:]
+        ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI BULUNAMADI"
+        return jsonify(error=f"[{ck}] {raw}"), 502
     except Exception:
         return jsonify(error="Beklenmeyen hata. yt-dlp'yi güncellemeyi dene."), 500
 
