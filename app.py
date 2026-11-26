@@ -62,6 +62,7 @@ def download():
         return jsonify(error="Geçerli bir Instagram gönderi, reel veya hikaye linki yapıştır."), 400
 
     vid = uuid.uuid4().hex[:12]
+    has_session = False
     opts = {
         "outtmpl": str(DOWNLOAD_DIR / f"{vid}.%(ext)s"),
         "format": "best[ext=mp4]/best",
@@ -74,6 +75,7 @@ def download():
         # Secret File salt okunur; yt-dlp cookies'i geri yazmak ister, o yüzden kopyalıyoruz
         tmp_cookies = DOWNLOAD_DIR / f"cookies_{vid}.txt"
         shutil.copyfile(COOKIES, tmp_cookies)
+        has_session = "sessionid" in tmp_cookies.read_text(errors="ignore")
         opts["cookiefile"] = str(tmp_cookies)
 
     try:
@@ -82,7 +84,7 @@ def download():
             path = Path(ydl.prepare_filename(info))
     except yt_dlp.utils.DownloadError as e:
         raw = str(e).replace("\n", " ")[-300:]
-        ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI BULUNAMADI"
+        ck = ("cookies yüklü, sessionid " + ("VAR" if has_session else "YOK")) if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI BULUNAMADI"
         return jsonify(error=f"[{ck}] {raw}"), 502
     except Exception as e:
         ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI YOK"
