@@ -81,8 +81,9 @@ def download():
         raw = str(e).replace("\n", " ")[-300:]
         ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI BULUNAMADI"
         return jsonify(error=f"[{ck}] {raw}"), 502
-    except Exception:
-        return jsonify(error="Beklenmeyen hata. yt-dlp'yi güncellemeyi dene."), 500
+    except Exception as e:
+        ck = "cookies yüklü" if (COOKIES and Path(COOKIES).exists()) else "cookies DOSYASI YOK"
+        return jsonify(error=f"[{ck}] {type(e).__name__}: {str(e)[-300:]}"), 500
 
     if not path.exists():
         return jsonify(error="Dosya bulunamadı."), 500
